@@ -91,6 +91,8 @@
 
   /* ── Mobile grid (vertical, full-width) ── */
   .mobile-grid { display: none; }
+  .inline-detail { display: none; }
+  .mobile-grid-label { display: none; }
 
   .mobile-month {
     margin-bottom: 24px;
@@ -582,7 +584,7 @@
   </div>
 
   <!-- Portrait mobile: inline detail panel (shown instead of overlay) -->
-  <div class="inline-detail" id="inlineDetail" style="display:none">
+  <div class="inline-detail" id="inlineDetail">
     <div class="detail-date">
       <div class="d-month" id="iMonth"></div>
       <div class="d-day" id="iDay"></div>
@@ -798,7 +800,7 @@ function isLandscapeMobile(){
 const inlineDetail=document.getElementById('inlineDetail');
 
 function showInlineDetail(show){
-  inlineDetail.style.display = show ? 'flex' : 'none';
+  // visibility controlled by CSS media query; nothing to do here
 }
 
 // ── Detail view ──
@@ -961,7 +963,7 @@ if(window.matchMedia('(hover:none)').matches){
 // ── Auto-show today's detail on portrait mobile ──
 if(tY===2026){
   const todayIdx=allDays.findIndex(x=>x.mi===tM&&x.d===tD);
-  if(todayIdx>=0&&isPortraitMobile()){
+  if(todayIdx>=0){
     currentIdx=todayIdx;
     renderInlineDetail(todayIdx);
   }
