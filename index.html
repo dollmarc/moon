@@ -384,9 +384,67 @@
     /* Hide header today-info — detail panel takes over */
     .today-info { display: none; }
 
-    /* Hide desktop grid, show mobile grid */
+    /* Hide desktop grid, show mobile grid as compact strip */
     .grid-wrapper { display: none; }
     .mobile-grid { display: block; }
+
+    /* ── Month strip mode ── */
+    .mobile-month {
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mobile-month-label {
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      color: #2e2e2e;
+      width: 28px;
+      flex-shrink: 0;
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    .mobile-days {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 2px;
+      overflow: hidden;
+      flex: 1;
+    }
+    /* Strip cells: tiny dots */
+    .mobile-days .moon-cell {
+      width: 7px;
+      height: 7px;
+      min-width: 7px;
+      max-width: 7px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      flex-shrink: 0;
+      justify-self: unset;
+    }
+    .mobile-days .moon-cell svg { display: none; }
+    /* Dot color reflects illumination */
+    .mobile-days .moon-cell::after {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: hsl(0 0% var(--dot-l, 15%));
+      display: block;
+      flex-shrink: 0;
+    }
+    /* Active cell gold ring stays */
+    .mobile-days .moon-cell.active-cell {
+      outline: 1.5px solid var(--gold);
+      outline-offset: 2px;
+    }
+    /* Today ring scaled to dot */
+    .mobile-days .today-ring {
+      top: -3px; left: -3px;
+      width: calc(100% + 6px);
+      height: calc(100% + 6px);
+    }
 
     /* ── Inline detail panel ── */
     .inline-detail {
@@ -417,18 +475,23 @@
     .inline-detail .nav-divider { display: none; }
     .inline-detail .swipe-hint { display: block; }
 
-    /* Overlay stays hidden on portrait — we use inline panel */
-    .detail-overlay { display: none !important; }
+    /* Strip section header */
+    .mobile-grid-label {
+      display: block;
+      font-size: 8px;
+      letter-spacing: 0.2em;
+      color: #252525;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      padding-top: 20px;
+      border-top: 0.5px solid #181818;
+    }
 
     footer { font-size: 8px; }
   }
 
   @media (max-width: 400px) and (orientation: portrait) {
     .title { font-size: 26px; }
-    .mobile-days {
-      grid-template-columns: repeat(auto-fill, minmax(24px, 1fr));
-      gap: 3px;
-    }
   }
 
   /* ── Mobile landscape: scaled-down desktop ── */
@@ -530,6 +593,7 @@
     <div class="swipe-hint">Swipe left or right to navigate</div>
   </div>
 
+  <span class="mobile-grid-label" id="mobileGridLabel">2026</span>
   <!-- Mobile: vertical month blocks -->
   <div class="mobile-grid" id="mobileGrid"></div>
 
@@ -635,6 +699,11 @@ function makeCell(mi, d, gIdx, size, mapRef) {
     ring.className='today-ring';
     cell.appendChild(ring);
   }
+
+  // Set dot color for portrait-strip mode (CSS ::after can't read JS, so use inline style on a data attr)
+  const illumVal = illuminationPct(phase);
+  const dotBrightness = Math.round(20 + illumVal * 1.8); // 20 (dark/new) → ~200 (bright/full)
+  cell.style.setProperty('--dot-l', dotBrightness + '%');
 
   const name=phaseName(phase), illum=illuminationPct(phase);
 
