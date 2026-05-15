@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026 Phases of the Moon</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #c8a84b;
+    --bg: #0d0d0d;
+    --cell: 20px;
+    --label-w: 100px;
+  }
+
+  body {
+    background: var(--bg);
+    color: #e0e0e0;
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 48px 32px 64px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 36px;
+    border-bottom: 0.5px solid #2a2a2a;
+    padding-bottom: 20px;
+    gap: 16px;
+  }
+
+  .title {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 42px;
+    letter-spacing: 0.06em;
+    color: #f0f0f0;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .title span {
+    display: block;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    color: #555;
+    margin-bottom: 8px;
+  }
+
+  .today-info {
+    text-align: right;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #666;
+    line-height: 1.8;
+  }
+  .today-info .phase-name { color: var(--gold); font-size: 13px; letter-spacing: 0.15em; }
+
+  /* ── Desktop grid (horizontal rows) ── */
+  .grid-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .grid { min-width: 700px; }
+
+  .month-row {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 0.5px solid #191919;
+    transition: background 0.1s;
+  }
+  .month-row:hover { background: rgba(255,255,255,0.015); }
+
+  .month-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: #4a4a4a;
+    width: var(--label-w);
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .days-row { display: flex; gap: 2px; align-items: center; flex-wrap: nowrap; }
+
+  /* ── Mobile grid (vertical, full-width) ── */
+  .mobile-grid { display: none; }
+
+  .mobile-month {
+    margin-bottom: 24px;
+  }
+  .mobile-month-label {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: #3a3a3a;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 0.5px solid #1e1e1e;
+  }
+  .mobile-days {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+    gap: 4px;
+  }
+
+  /* ── Moon cell (shared) ── */
+  .moon-cell {
+    width: var(--cell);
+    height: var(--cell);
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: transform 0.12s;
+  }
+  .moon-cell:hover { transform: scale(1.55); z-index: 10; }
+  .moon-cell:active { transform: scale(1.3); }
+  .moon-cell.active-cell {
+    outline: 1.5px solid var(--gold);
+    outline-offset: 3px;
+    z-index: 5;
+  }
+
+  /* Mobile cells are bigger for touch */
+  .mobile-days .moon-cell {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    max-width: 40px;
+    justify-self: center;
+  }
+  .mobile-days .moon-cell svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .today-ring {
+    position: absolute;
+    top: -3px; left: -3px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gold);
+    pointer-events: none;
+    z-index: 2;
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+  /* Mobile today ring scales with cell */
+  .mobile-days .today-ring {
+    top: -4px; left: -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 8px);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(200,168,75,0); }
+    50% { opacity: 0.85; box-shadow: 0 0 0 4px rgba(200,168,75,0.12); }
+  }
+
+  /* ── Detail overlay ── */
+  .detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6,6,6,0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    padding: 20px;
+  }
+  .detail-overlay.open { opacity: 1; pointer-events: all; }
+
+  .detail-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    max-width: 400px;
+    width: 100%;
+    position: relative;
+  }
+
+  .detail-close {
+    position: absolute;
+    top: 0; right: 0;
+    background: none;
+    border: none;
+    color: #333;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    cursor: pointer;
+    padding: 4px 0;
+    transition: color 0.15s;
+    text-transform: uppercase;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+  .detail-close:hover { color: #888; }
+
+  .detail-moon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.18s ease;
+    filter: drop-shadow(0 0 40px rgba(200,168,75,0.08));
+  }
+
+  .detail-date { text-align: center; }
+  .detail-date .d-month {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: #444;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .detail-date .d-day {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(56px, 15vw, 88px);
+    color: #f0f0f0;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+  }
+  .detail-date .d-year {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: #2c2c2c;
+    margin-top: 8px;
+  }
+
+  .detail-divider { width: 32px; height: 0.5px; background: #222; flex-shrink: 0; }
+
+  .detail-meta { text-align: center; }
+  .detail-meta .d-phase-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: clamp(22px, 6vw, 30px);
+    font-weight: 300;
+    color: var(--gold);
+    letter-spacing: 0.04em;
+    margin-bottom: 14px;
+    line-height: 1;
+  }
+  .detail-meta .d-stats {
+    display: flex;
+    gap: 28px;
+    justify-content: center;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: #3a3a3a;
+    text-transform: uppercase;
+  }
+  .detail-meta .d-stats span { color: #777; }
+
+  /* Nav */
+  .detail-nav {
+    display: flex;
+    align-items: center;
+    margin-top: 4px;
+    border: 0.5px solid #222;
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .nav-btn {
+    background: none;
+    border: none;
+    color: #555;
+    width: 64px;
+    height: 52px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: background 0.15s, color 0.15s;
+    font-family: 'DM Mono', monospace;
+    /* big touch target */
+    min-width: 56px;
+  }
+  .nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.04); color: #ccc; }
+  .nav-btn:active:not(:disabled) { background: rgba(255,255,255,0.08); }
+  .nav-btn:disabled { opacity: 0.2; cursor: default; }
+  .nav-divider { width: 0.5px; height: 18px; background: #222; flex-shrink: 0; }
+  .nav-hint-inner {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: #2e2e2e;
+    text-align: center;
+    padding: 0 16px;
+    text-transform: uppercase;
+    line-height: 1;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* Swipe hint — mobile only */
+  .swipe-hint {
+    display: none;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: #252525;
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: #1a1a1a;
+    border: 0.5px solid #333;
+    color: #ddd;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    display: none;
+    line-height: 1.7;
+  }
+  .tooltip strong { color: #fff; font-weight: 400; }
+  .tooltip .tp-phase { color: var(--gold); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 0.5px solid #2a2a2a;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #555;
+    text-transform: uppercase;
+  }
+
+  footer {
+    margin-top: 40px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: #252525;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ── Mobile portrait: inline detail view ── */
+  @media (max-width: 600px) and (orientation: portrait) {
+    body { padding: 24px 16px 48px; }
+
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .title { font-size: 30px; }
+    .title span { font-size: 11px; }
+
+    /* Hide header today-info — detail panel takes over */
+    .today-info { display: none; }
+
+    /* Hide desktop grid, show mobile grid */
+    .grid-wrapper { display: none; }
+    .mobile-grid { display: block; }
+
+    /* ── Inline detail panel ── */
+    .inline-detail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 16px 24px;
+      margin-bottom: 28px;
+      border: 0.5px solid #1e1e1e;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.015);
+    }
+
+    .inline-detail .detail-date .d-day {
+      font-size: clamp(52px, 18vw, 80px);
+    }
+
+    .inline-detail .detail-moon {
+      filter: drop-shadow(0 0 32px rgba(200,168,75,0.10));
+    }
+
+    .inline-detail .detail-nav {
+      margin-top: 0;
+    }
+
+    .inline-detail .nav-hint-inner { display: none; }
+    .inline-detail .nav-divider { display: none; }
+    .inline-detail .swipe-hint { display: block; }
+
+    /* Overlay stays hidden on portrait — we use inline panel */
+    .detail-overlay { display: none !important; }
+
+    footer { font-size: 8px; }
+  }
+
+  @media (max-width: 400px) and (orientation: portrait) {
+    .title { font-size: 26px; }
+    .mobile-days {
+      grid-template-columns: repeat(auto-fill, minmax(24px, 1fr));
+      gap: 3px;
+    }
+  }
+
+  /* ── Mobile landscape: scaled-down desktop ── */
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+    :root {
+      --cell: 14px;
+      --label-w: 72px;
+    }
+
+    body { padding: 20px 16px 32px; }
+
+    header {
+      flex-direction: row;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+    }
+    .title { font-size: 26px; }
+    .title span { font-size: 10px; margin-bottom: 5px; }
+    .today-info { font-size: 10px; }
+    .today-info .phase-name { font-size: 11px; }
+
+    /* Show desktop grid, hide mobile grid */
+    .grid-wrapper { display: block; overflow-x: auto; }
+    .mobile-grid { display: none; }
+    .grid { min-width: 500px; }
+
+    .month-row { padding: 3px 0; }
+    .month-label { font-size: 8px; letter-spacing: 0.14em; }
+    .days-row { gap: 1px; }
+
+    .moon-cell:hover { transform: scale(1.5); }
+
+    .today-ring {
+      top: -2px; left: -2px;
+      width: 18px; height: 18px;
+    }
+
+    .legend {
+      gap: 7px 14px;
+      margin-top: 20px;
+      padding-top: 14px;
+    }
+    .legend-item { font-size: 9px; gap: 6px; }
+
+    footer { font-size: 8px; margin-top: 20px; }
+
+    /* Detail overlay: compact on landscape */
+    .detail-card {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      max-width: 600px;
+    }
+    .detail-date .d-day { font-size: clamp(40px, 10vw, 60px); }
+    .detail-close { top: -8px; }
+    .detail-meta .d-phase-name { font-size: clamp(18px, 4vw, 24px); margin-bottom: 8px; }
+    .detail-divider { display: none; }
+    .nav-btn { height: 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="title">
+      <span>Moon phases</span>
+      2026
+    </div>
+    <div class="today-info" id="todayInfo"></div>
+  </header>
+
+  <!-- Desktop: horizontal scrolling rows -->
+  <div class="grid-wrapper">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- Portrait mobile: inline detail panel (shown instead of overlay) -->
+  <div class="inline-detail" id="inlineDetail" style="display:none">
+    <div class="detail-date">
+      <div class="d-month" id="iMonth"></div>
+      <div class="d-day" id="iDay"></div>
+      <div class="d-year">2026</div>
+    </div>
+    <div class="detail-moon" id="inlineMoon"></div>
+    <div class="detail-meta">
+      <div class="d-phase-name" id="iPhaseName"></div>
+      <div class="d-stats">
+        <div>Illumination&nbsp;<span id="iIllum"></span></div>
+        <div>Cycle day&nbsp;<span id="iDayNum"></span></div>
+      </div>
+    </div>
+    <div class="detail-nav">
+      <button class="nav-btn" id="iNavPrev" aria-label="Previous day">←</button>
+      <button class="nav-btn" id="iNavNext" aria-label="Next day">→</button>
+    </div>
+    <div class="swipe-hint">Swipe left or right to navigate</div>
+  </div>
+
+  <!-- Mobile: vertical month blocks -->
+  <div class="mobile-grid" id="mobileGrid"></div>
+
+  <div class="legend" id="legend"></div>
+  <footer id="footer">Tap any moon to explore &nbsp;·&nbsp; Swipe or ← → to navigate</footer>
+</div>
+
+<!-- Detail overlay -->
+<div class="detail-overlay" id="detailOverlay" role="dialog" aria-modal="true" aria-label="Moon phase detail">
+  <div class="detail-card" id="detailCard">
+    <button class="detail-close" id="detailClose">Esc · Close</button>
+
+    <div class="detail-date">
+      <div class="d-month" id="dMonth"></div>
+      <div class="d-day" id="dDay"></div>
+      <div class="d-year">2026</div>
+    </div>
+
+    <div class="detail-divider"></div>
+    <div class="detail-moon" id="detailMoon"></div>
+
+    <div class="detail-meta">
+      <div class="d-phase-name" id="dPhaseName"></div>
+      <div class="d-stats">
+        <div>Illumination&nbsp;<span id="dIllum"></span></div>
+        <div>Cycle day&nbsp;<span id="dDayNum"></span></div>
+      </div>
+    </div>
+
+    <div class="detail-nav">
+      <button class="nav-btn" id="navPrev" aria-label="Previous day">←</button>
+      <div class="nav-divider"></div>
+      <div class="nav-hint-inner">← · →</div>
+      <div class="nav-divider"></div>
+      <button class="nav-btn" id="navNext" aria-label="Next day">→</button>
+    </div>
+    <div class="swipe-hint">Swipe left or right to navigate</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+function jd(y,m,d){if(m<=2){y--;m+=12;}const A=Math.floor(y/100),B=2-A+Math.floor(A/4);return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(m+1))+d+B-1524.5;}
+function moonPhase(y,m,d){const j=jd(y,m,d),days=(j-2451549.5)%29.53058867;return(days<0?days+29.53058867:days)/29.53058867;}
+function phaseName(p){if(p<0.03||p>=0.97)return'New Moon';if(p<0.22)return'Waxing Crescent';if(p<0.28)return'First Quarter';if(p<0.47)return'Waxing Gibbous';if(p<0.53)return'Full Moon';if(p<0.72)return'Waning Gibbous';if(p<0.78)return'Last Quarter';return'Waning Crescent';}
+function illuminationPct(p){return p<=0.5?Math.round(p*2*100):Math.round((1-(p-0.5)*2)*100);}
+function cycleDay(p){return Math.round(p*29.53)||1;}
+
+function moonSVG(phase, size) {
+  const r=(size/2)-0.5, cx=size/2, cy=size/2;
+  const LIT='#dddddd', DARK='#1c1c1c', STROKE='#3a3a3a';
+  if(phase<0.03||phase>0.97)return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}" stroke="${STROKE}" stroke-width="0.8"/></svg>`;
+  if(phase>0.47&&phase<0.53)return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/></svg>`;
+  const waxing=phase<0.5;
+  const termRy=r*Math.abs(Math.cos(phase*Math.PI*2));
+  const isGibbous=(phase>0.25&&phase<0.75);
+  if(waxing){
+    if(!isGibbous){
+      const p=`M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} A ${termRy} ${r} 0 0 0 ${cx} ${cy-r} Z`;
+      return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}" stroke="${STROKE}" stroke-width="0.8"/><path d="${p}" fill="${LIT}" stroke="none"/></svg>`;
+    }else{
+      const p=`M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} A ${termRy} ${r} 0 0 1 ${cx} ${cy-r} Z`;
+      return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/><path d="${p}" fill="${DARK}" stroke="none"/></svg>`;
+    }
+  }else{
+    if(!isGibbous){
+      const p=`M ${cx} ${cy-r} A ${r} ${r} 0 0 0 ${cx} ${cy+r} A ${termRy} ${r} 0 0 1 ${cx} ${cy-r} Z`;
+      return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${DARK}" stroke="${STROKE}" stroke-width="0.8"/><path d="${p}" fill="${LIT}" stroke="none"/></svg>`;
+    }else{
+      const p=`M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} A ${termRy} ${r} 0 0 0 ${cx} ${cy-r} Z`;
+      return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${LIT}"/><path d="${p}" fill="${DARK}" stroke="none"/></svg>`;
+    }
+  }
+}
+
+// Build day index
+const allDays=[];
+for(let mi=0;mi<12;mi++)
+  for(let d=1;d<=MONTH_DAYS[mi];d++)
+    allDays.push({mi,d,phase:moonPhase(2026,mi+1,d)});
+
+const today=new Date();
+const tY=today.getFullYear(),tM=today.getMonth(),tD=today.getDate();
+let currentIdx=null, activeCellEl=null;
+const cellMapD={}, cellMapM={};
+
+const tooltip=document.getElementById('tooltip');
+const overlay=document.getElementById('detailOverlay');
+
+function makeCell(mi, d, gIdx, size, mapRef) {
+  const {phase}=allDays[gIdx];
+  const cell=document.createElement('div');
+  cell.className='moon-cell';
+  cell.innerHTML=moonSVG(phase, size);
+  mapRef[`${mi}-${d}`]=cell;
+
+  if(tY===2026&&tM===mi&&tD===d){
+    const ring=document.createElement('div');
+    ring.className='today-ring';
+    cell.appendChild(ring);
+  }
+
+  const name=phaseName(phase), illum=illuminationPct(phase);
+
+  // Desktop tooltip (mouse only)
+  cell.addEventListener('mouseenter',e=>{
+    if(window.matchMedia('(hover:none)').matches)return;
+    tooltip.innerHTML=`<strong>${MONTHS[mi]} ${d}, 2026</strong><br><span class="tp-phase">${name}</span><br>${illum}% illuminated`;
+    tooltip.style.display='block';
+  });
+  cell.addEventListener('mousemove',e=>{
+    tooltip.style.left=(e.clientX+16)+'px';
+    tooltip.style.top=(e.clientY-12)+'px';
+  });
+  cell.addEventListener('mouseleave',()=>tooltip.style.display='none');
+  cell.addEventListener('click',()=>{tooltip.style.display='none';openDetail(gIdx);});
+  return cell;
+}
+
+// ── Desktop grid ──
+const grid=document.getElementById('grid');
+for(let mi=0;mi<12;mi++){
+  const row=document.createElement('div');
+  row.className='month-row';
+  const lbl=document.createElement('div');
+  lbl.className='month-label';
+  lbl.textContent=MONTHS[mi];
+  row.appendChild(lbl);
+  const daysRow=document.createElement('div');
+  daysRow.className='days-row';
+  for(let d=1;d<=MONTH_DAYS[mi];d++){
+    const gIdx=allDays.findIndex(x=>x.mi===mi&&x.d===d);
+    daysRow.appendChild(makeCell(mi,d,gIdx,18,cellMapD));
+  }
+  row.appendChild(daysRow);
+  grid.appendChild(row);
+}
+
+// ── Mobile grid ──
+const mobileGrid=document.getElementById('mobileGrid');
+for(let mi=0;mi<12;mi++){
+  const block=document.createElement('div');
+  block.className='mobile-month';
+  const lbl=document.createElement('div');
+  lbl.className='mobile-month-label';
+  lbl.textContent=MONTHS[mi].toUpperCase();
+  block.appendChild(lbl);
+  const days=document.createElement('div');
+  days.className='mobile-days';
+  for(let d=1;d<=MONTH_DAYS[mi];d++){
+    const gIdx=allDays.findIndex(x=>x.mi===mi&&x.d===d);
+    days.appendChild(makeCell(mi,d,gIdx,28,cellMapM));
+  }
+  block.appendChild(days);
+  mobileGrid.appendChild(block);
+}
+
+// ── Today header ──
+const todayInfo=document.getElementById('todayInfo');
+if(tY===2026){
+  const idx=allDays.findIndex(x=>x.mi===tM&&x.d===tD);
+  if(idx>=0){
+    const {phase}=allDays[idx];
+    todayInfo.innerHTML=`
+      <div>${moonSVG(phase,28)}</div>
+      <div style="margin-top:5px"><span class="phase-name">${phaseName(phase)}</span></div>
+      <div>${MONTHS[tM]} ${tD}, 2026 · ${illuminationPct(phase)}% illuminated</div>
+      <div style="margin-top:3px;font-size:10px;color:#3a3a3a">Today · highlighted in gold</div>
+    `;
+  }
+} else {
+  todayInfo.innerHTML=`<div style="color:#3a3a3a;font-size:10px">Showing full year 2026</div>`;
+}
+
+// ── Layout helpers ──
+function isPortraitMobile(){
+  return window.innerWidth<=600 && window.innerHeight>window.innerWidth;
+}
+function isLandscapeMobile(){
+  return window.innerWidth<=900 && window.innerHeight<=500 && window.innerWidth>window.innerHeight;
+}
+
+const inlineDetail=document.getElementById('inlineDetail');
+
+function showInlineDetail(show){
+  inlineDetail.style.display = show ? 'flex' : 'none';
+}
+
+// ── Detail view ──
+function openDetail(idx){
+  currentIdx=idx;
+  if(isPortraitMobile()){
+    renderInlineDetail(idx);
+    // scroll inline panel into view
+    inlineDetail.scrollIntoView({behavior:'smooth', block:'start'});
+  } else {
+    renderDetail(idx);
+    overlay.classList.add('open');
+  }
+}
+
+function renderInlineDetail(idx){
+  const {mi,d,phase}=allDays[idx];
+  showInlineDetail(true);
+  document.getElementById('iMonth').textContent=MONTHS[mi].toUpperCase();
+  document.getElementById('iDay').textContent=d;
+  document.getElementById('iPhaseName').textContent=phaseName(phase);
+  document.getElementById('iIllum').textContent=illuminationPct(phase)+'%';
+  document.getElementById('iDayNum').textContent=cycleDay(phase)+' / 29';
+
+  const moonSize=Math.min(window.innerWidth-80, 160);
+  const moon=document.getElementById('inlineMoon');
+  moon.style.opacity='0';
+  setTimeout(()=>{moon.innerHTML=moonSVG(phase,moonSize);moon.style.opacity='1';},110);
+
+  syncActiveCells(mi,d);
+
+  document.getElementById('iNavPrev').disabled=idx===0;
+  document.getElementById('iNavNext').disabled=idx===allDays.length-1;
+}
+
+function renderDetail(idx){
+  const {mi,d,phase}=allDays[idx];
+  document.getElementById('dMonth').textContent=MONTHS[mi].toUpperCase();
+  document.getElementById('dDay').textContent=d;
+  document.getElementById('dPhaseName').textContent=phaseName(phase);
+  document.getElementById('dIllum').textContent=illuminationPct(phase)+'%';
+  document.getElementById('dDayNum').textContent=cycleDay(phase)+' / 29';
+
+  const moonSize=isLandscapeMobile()?Math.min(window.innerHeight-80,120):200;
+  const moon=document.getElementById('detailMoon');
+  moon.style.opacity='0';
+  setTimeout(()=>{moon.innerHTML=moonSVG(phase,moonSize);moon.style.opacity='1';},110);
+
+  syncActiveCells(mi,d);
+
+  document.getElementById('navPrev').disabled=idx===0;
+  document.getElementById('navNext').disabled=idx===allDays.length-1;
+}
+
+function syncActiveCells(mi,d){
+  if(activeCellEl){activeCellEl.classList.remove('active-cell');}
+  const key=`${mi}-${d}`;
+  [cellMapD[key],cellMapM[key]].forEach(c=>{if(c)c.classList.remove('active-cell');});
+  if(cellMapD[key]){cellMapD[key].classList.add('active-cell');}
+  if(cellMapM[key]){cellMapM[key].classList.add('active-cell');}
+  activeCellEl=(isPortraitMobile()?cellMapM[key]:cellMapD[key])||null;
+  if(activeCellEl){activeCellEl.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});}
+}
+
+function closeDetail(){
+  overlay.classList.remove('open');
+  [cellMapD,cellMapM].forEach(map=>{
+    Object.values(map).forEach(c=>c.classList.remove('active-cell'));
+  });
+  activeCellEl=null; currentIdx=null;
+}
+
+function navigate(dir){
+  if(currentIdx===null)return;
+  const n=currentIdx+dir;
+  if(n<0||n>=allDays.length)return;
+  currentIdx=n;
+  if(isPortraitMobile()){
+    renderInlineDetail(n);
+  } else {
+    renderDetail(n);
+  }
+}
+
+document.getElementById('navPrev').addEventListener('click',()=>navigate(-1));
+document.getElementById('navNext').addEventListener('click',()=>navigate(1));
+document.getElementById('detailClose').addEventListener('click',closeDetail);
+document.getElementById('iNavPrev').addEventListener('click',()=>navigate(-1));
+document.getElementById('iNavNext').addEventListener('click',()=>navigate(1));
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeDetail();});
+
+document.addEventListener('keydown',e=>{
+  if(!overlay.classList.contains('open'))return;
+  if(e.key==='ArrowLeft'){e.preventDefault();navigate(-1);}
+  else if(e.key==='ArrowRight'){e.preventDefault();navigate(1);}
+  else if(e.key==='Escape')closeDetail();
+});
+
+// ── Touch swipe on detail overlay ──
+let touchStartX=0, touchStartY=0;
+const card=document.getElementById('detailCard');
+card.addEventListener('touchstart',e=>{
+  touchStartX=e.touches[0].clientX;
+  touchStartY=e.touches[0].clientY;
+},{passive:true});
+card.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  const dy=e.changedTouches[0].clientY-touchStartY;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40){navigate(dx<0?1:-1);}
+},{passive:true});
+
+// ── Touch swipe on inline panel ──
+const inlineCard=document.getElementById('inlineDetail');
+let iTouchX=0, iTouchY=0;
+inlineCard.addEventListener('touchstart',e=>{
+  iTouchX=e.touches[0].clientX; iTouchY=e.touches[0].clientY;
+},{passive:true});
+inlineCard.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-iTouchX;
+  const dy=e.changedTouches[0].clientY-iTouchY;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40){navigate(dx<0?1:-1);}
+},{passive:true});
+
+// Re-render moon size on resize / orientation change
+window.addEventListener('resize',()=>{
+  if(currentIdx===null)return;
+  const {phase}=allDays[currentIdx];
+  if(isPortraitMobile()){
+    overlay.classList.remove('open');
+    renderInlineDetail(currentIdx);
+  } else {
+    showInlineDetail(false);
+    if(overlay.classList.contains('open')){
+      const moonSize=isLandscapeMobile()?Math.min(window.innerHeight-80,120):200;
+      document.getElementById('detailMoon').innerHTML=moonSVG(phase,moonSize);
+    }
+  }
+});
+
+// ── Legend ──
+const LEGEND_DATA=[
+  {phase:0.01,label:'New moon'},{phase:0.15,label:'Waxing crescent'},
+  {phase:0.25,label:'First quarter'},{phase:0.38,label:'Waxing gibbous'},
+  {phase:0.50,label:'Full moon'},{phase:0.63,label:'Waning gibbous'},
+  {phase:0.75,label:'Last quarter'},{phase:0.88,label:'Waning crescent'},
+];
+const legend=document.getElementById('legend');
+LEGEND_DATA.forEach(({phase,label})=>{
+  const item=document.createElement('div');
+  item.className='legend-item';
+  item.innerHTML=moonSVG(phase,16)+`<span>${label}</span>`;
+  legend.appendChild(item);
+});
+
+// Update footer hint
+if(window.matchMedia('(hover:none)').matches){
+  document.getElementById('footer').textContent='Tap any moon to explore · Swipe to navigate';
+}
+
+// ── Auto-show today's detail on portrait mobile ──
+if(tY===2026){
+  const todayIdx=allDays.findIndex(x=>x.mi===tM&&x.d===tD);
+  if(todayIdx>=0&&isPortraitMobile()){
+    currentIdx=todayIdx;
+    renderInlineDetail(todayIdx);
+  }
+}
+</script>
+</body>
+</html>
